@@ -62,7 +62,6 @@ def main():
                 args = json.loads(call.function.arguments)
                 with open(args["file_path"]) as f:
                     result = f.read()
-                print(result)
                 messages.append(
                     {"role": "tool", "tool_call_id": call.id, "content": result}
                 )
