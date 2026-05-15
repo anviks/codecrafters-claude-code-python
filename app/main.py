@@ -50,15 +50,14 @@ def main():
             raise RuntimeError("no choices in response")
 
         choice = chat.choices[0]
+        calls = choice.message.tool_calls
         messages.append(choice.message)
 
-        if choice.message.content:
+        if not calls:
             print(choice.message.content)
             break
-        else:
-            calls = choice.message.tool_calls
-            assert calls and len(calls) == 1
-            call = calls[0]
+
+        for call in calls:
             if call.function.name == "Read":
                 args = json.loads(call.function.arguments)
                 with open(args["file_path"]) as f:
