@@ -8,6 +8,47 @@ from openai import OpenAI
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 BASE_URL = os.getenv("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
 
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "Read",
+            "description": "Read and return the contents of a file",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "The path to the file to read",
+                    }
+                },
+                "required": ["file_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "Write",
+            "description": "Write content to a file",
+            "parameters": {
+                "type": "object",
+                "required": ["file_path", "content"],
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "The path of the file to write to",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The content to write to the file",
+                    },
+                },
+            },
+        },
+    },
+]
+
 
 def main():
     p = argparse.ArgumentParser()
@@ -25,25 +66,7 @@ def main():
         chat = client.chat.completions.create(
             model="anthropic/claude-haiku-4.5",
             messages=messages,
-            tools=[
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "Read",
-                        "description": "Read and return the contents of a file",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "file_path": {
-                                    "type": "string",
-                                    "description": "The path to the file to read",
-                                }
-                            },
-                            "required": ["file_path"],
-                        },
-                    },
-                }
-            ],
+            tools=TOOLS,
         )
 
         if not chat.choices or len(chat.choices) == 0:
@@ -64,6 +87,13 @@ def main():
                     result = f.read()
                 messages.append(
                     {"role": "tool", "tool_call_id": call.id, "content": result}
+                )
+            elif call.function.name == "Write":
+                args = json.loads(call.function.arguments)
+                with open(args["file_path"], "w") as f:
+                    f.write(args["content"])
+                messages.append(
+                    {"role": "tool", "tool_call_id": call.id, "content": None}
                 )
 
 
