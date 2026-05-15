@@ -119,8 +119,7 @@ def main():
                 )
             elif call.function.name == "Bash":
                 args = json.loads(call.function.arguments)
-                print('ARGSSSS', args)
-                # subprocess.run()
+                subprocess.run(args['command'])
                 messages.append(
                     {
                         "role": "tool",
