@@ -119,12 +119,18 @@ def main():
                 )
             elif call.function.name == "Bash":
                 args = json.loads(call.function.arguments)
-                os.system(args['command'])
+                result = subprocess.run(
+                    args["command"],
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                )
+                output = result.stdout + result.stderr
                 messages.append(
                     {
                         "role": "tool",
                         "tool_call_id": call.id,
-                        "content": "Successfully executed a command",
+                        "content": output if output else "Command completed with no output",
                     }
                 )
 
