@@ -1,8 +1,8 @@
 import argparse
 import json
 import os
+from pathlib import Path
 import subprocess
-import sys
 
 from openai import OpenAI
 
@@ -71,14 +71,14 @@ TOOLS = [
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("-p", required=True)
-    args = p.parse_args()
+    cli_args = p.parse_args()
 
     if not API_KEY:
         raise RuntimeError("OPENROUTER_API_KEY is not set")
 
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-    messages = [{"role": "user", "content": args.p}]
+    messages = [{"role": "user", "content": cli_args.p}]
 
     while True:
         chat = client.chat.completions.create(
@@ -101,15 +101,13 @@ def main():
         for call in calls:
             if call.function.name == "Read":
                 args = json.loads(call.function.arguments)
-                with open(args["file_path"]) as f:
-                    result = f.read()
+                result = Path(args["file_path"]).read_text()
                 messages.append(
                     {"role": "tool", "tool_call_id": call.id, "content": result}
                 )
             elif call.function.name == "Write":
                 args = json.loads(call.function.arguments)
-                with open(args["file_path"], "w") as f:
-                    f.write(args["content"])
+                Path(args["file_path"]).write_text(args["content"])
                 messages.append(
                     {
                         "role": "tool",
@@ -130,7 +128,9 @@ def main():
                     {
                         "role": "tool",
                         "tool_call_id": call.id,
-                        "content": output if output else "Command completed with no output",
+                        "content": (
+                            output if output else "Command completed with no output"
+                        ),
                     }
                 )
 
