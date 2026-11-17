@@ -91,9 +91,14 @@ def main():
 
     prompt: str = cli_args.p
     if prompt.startswith("/"):
-        skill, prompt = (prompt[1:] + " ").split(" ", 1)
+        skill, *args = prompt[1:].split(" ")
         skill_text = (skills_path / skill / "SKILL.md").read_text()
-        prompt = re.sub(r"--\n.*\n.*\n--\n\n", "", skill_text) + prompt
+        body = re.sub(r"--\n.*\n.*\n--\n\n", "", skill_text)
+
+        for i, arg in enumerate(args):
+            body = body.replace(f"$ARGUMENTS[{i}]", arg).replace(f"${i}", arg)
+
+        body = body.replace("$ARGUMENTS", " ".join(args))
 
     messages = [
         {"role": "system", "content": system_prompt},
