@@ -89,9 +89,15 @@ def main():
                 re.search(r"--\nname: (.*)\ndescription: (.*)\n--", skill_text).groups()
             )
 
+    prompt: str = cli_args.p
+    if prompt.startswith("/"):
+        skill, prompt = prompt[1:].split(" ", 1)
+        skill_text = (skills_path / skill / "SKILL.md").read_text()
+        prompt = re.sub(r"--\n.*\n.*\n--\n\n", "", skill_text) + prompt
+
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": cli_args.p},
+        {"role": "user", "content": prompt},
     ]
 
     while True:
