@@ -91,7 +91,7 @@ def main():
 
     prompt: str = cli_args.p
     if prompt.startswith("/"):
-        skill, prompt = prompt[1:].split(" ", 1)
+        skill, prompt = (prompt[1:] + " ").split(" ", 1)
         skill_text = (skills_path / skill / "SKILL.md").read_text()
         prompt = re.sub(r"--\n.*\n.*\n--\n\n", "", skill_text) + prompt
 
