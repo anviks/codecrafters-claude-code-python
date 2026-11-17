@@ -98,7 +98,7 @@ def main():
         for i, arg in enumerate(args):
             body = body.replace(f"$ARGUMENTS[{i}]", arg).replace(f"${i}", arg)
 
-        body = body.replace("$ARGUMENTS", " ".join(args))
+        prompt = body.replace("$ARGUMENTS", " ".join(args))
 
     messages = [
         {"role": "system", "content": system_prompt},
