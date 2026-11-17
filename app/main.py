@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 
 from openai import OpenAI
@@ -78,7 +79,20 @@ def main():
 
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-    messages = [{"role": "user", "content": cli_args.p}]
+    system_prompt = ""
+    skills_path = Path(".claude/skills/")
+    if skills_path.exists():
+        system_prompt += "You have access to the following skills:\n\n"
+        for skill in skills_path.iterdir():
+            skill_text = (skill / "SKILL.md").read_text()
+            system_prompt += "- " + ": ".join(
+                re.search(r"--\nname: (.*)\ndescription: (.*)\n--", skill_text).groups()
+            )
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": cli_args.p},
+    ]
 
     while True:
         chat = client.chat.completions.create(
