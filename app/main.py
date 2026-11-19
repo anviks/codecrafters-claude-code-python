@@ -10,6 +10,7 @@ from openai import OpenAI
 
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 BASE_URL = os.getenv("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1")
+SKILLS_PATH = Path(".claude/skills/")
 
 TOOLS = [
     {
@@ -67,7 +68,38 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "Skill",
+            "description": "Load a skill's instructions into the conversation",
+            "parameters": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the skill to use",
+                    },
+                    "args": {
+                        "type": "string",
+                        "description": "Optional arguments for the skill",
+                    },
+                },
+            },
+        },
+    },
 ]
+
+
+def apply_skill(skill: str, args: list[str]) -> str:
+    skill_text = (SKILLS_PATH / skill / "SKILL.md").read_text()
+    body = re.sub(r"---\n.*\n.*\n---\n\n", "", skill_text)
+
+    for i, arg in enumerate(args):
+        body = body.replace(f"$ARGUMENTS[{i}]", arg).replace(f"${i}", arg)
+
+    return body.replace("$ARGUMENTS", " ".join(args))
 
 
 def main():
@@ -81,14 +113,16 @@ def main():
     client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
     system_prompt = ""
-    skills_path = Path(".claude/skills/")
-    if skills_path.exists():
-        system_prompt += "You have access to the following skills:\n\n"
-        for skill in skills_path.iterdir():
+    if SKILLS_PATH.exists():
+        system_prompt += "You have access to the following skills:\n"
+        for skill in SKILLS_PATH.iterdir():
             skill_text = (skill / "SKILL.md").read_text()
-            system_prompt += "- " + ": ".join(
-                re.search(r"---\nname: (.*)\ndescription: (.*)\n---", skill_text).groups()
+            system_prompt += "\n- " + ": ".join(
+                re.search(
+                    r"---\nname: (.*)\ndescription: (.*)\n---", skill_text
+                ).groups()
             )
+        system_prompt += "\n\nIf a skill matches the user's request, call the Skill tool with its name and follow the instructions it returns."
 
     prompt: str = cli_args.p
     args = prompt.split(" ")
@@ -103,15 +137,7 @@ def main():
         args = list(itertools.dropwhile(is_skill, args))
 
         for skill in skills:
-            skill_text = (skills_path / skill[1:] / "SKILL.md").read_text()
-            body = re.sub(r"---\n.*\n.*\n---\n\n", "", skill_text)
-
-            for i, arg in enumerate(args):
-                body = body.replace(f"$ARGUMENTS[{i}]", arg).replace(f"${i}", arg)
-
-            messages.append(
-                {"role": "user", "content": body.replace("$ARGUMENTS", " ".join(args))}
-            )
+            messages.append({"role": "user", "content": apply_skill(skill[1:], args)})
     else:
         messages.append({"role": "user", "content": prompt})
 
@@ -165,6 +191,18 @@ def main():
                         "tool_call_id": call.id,
                         "content": (
                             output if output else "Command completed with no output"
+                        ),
+                    }
+                )
+            elif call.function.name == "Skill":
+                args = json.loads(call.function.arguments)
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "content": apply_skill(
+                            args["name"],
+                            args["args"].split(" ") if "args" in args else [],
                         ),
                     }
                 )
