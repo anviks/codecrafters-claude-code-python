@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import json
 import os
 from pathlib import Path
@@ -86,24 +87,33 @@ def main():
         for skill in skills_path.iterdir():
             skill_text = (skill / "SKILL.md").read_text()
             system_prompt += "- " + ": ".join(
-                re.search(r"--\nname: (.*)\ndescription: (.*)\n--", skill_text).groups()
+                re.search(r"---\nname: (.*)\ndescription: (.*)\n---", skill_text).groups()
             )
 
     prompt: str = cli_args.p
-    if prompt.startswith("/"):
-        skill, *args = prompt[1:].split(" ")
-        skill_text = (skills_path / skill / "SKILL.md").read_text()
-        body = re.sub(r"--\n.*\n.*\n--\n\n", "", skill_text)
-
-        for i, arg in enumerate(args):
-            body = body.replace(f"$ARGUMENTS[{i}]", arg).replace(f"${i}", arg)
-
-        prompt = body.replace("$ARGUMENTS", " ".join(args))
+    args = prompt.split(" ")
 
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt},
     ]
+
+    is_skill = lambda x: x.startswith("/")
+    if is_skill(prompt):
+        skills = list(itertools.takewhile(is_skill, args))
+        args = list(itertools.dropwhile(is_skill, args))
+
+        for skill in skills:
+            skill_text = (skills_path / skill[1:] / "SKILL.md").read_text()
+            body = re.sub(r"---\n.*\n.*\n---\n\n", "", skill_text)
+
+            for i, arg in enumerate(args):
+                body = body.replace(f"$ARGUMENTS[{i}]", arg).replace(f"${i}", arg)
+
+            messages.append(
+                {"role": "user", "content": body.replace("$ARGUMENTS", " ".join(args))}
+            )
+    else:
+        messages.append({"role": "user", "content": prompt})
 
     while True:
         chat = client.chat.completions.create(
